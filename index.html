@@ -2,72 +2,90 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Simulador Sistema Pegasus HWM - Válvula PRV</title>
+    <title>HWM Pegasus - Simulación Realista PRV</title>
     <style>
-        body { font-family: sans-serif; background: #f0f4f8; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 600px; text-align: center; }
-        .valve-box { width: 300px; height: 150px; border: 4px solid #333; margin: 20px auto; position: relative; background: #ddd; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-        .gate { width: 100%; height: 80%; background: #2c3e50; position: absolute; top: 10%; transition: transform 0.5s ease-in-out; }
-        .water { position: absolute; height: 100%; background: #3498db; opacity: 0.6; z-index: -1; }
-        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-        button { padding: 10px; cursor: pointer; border: none; border-radius: 5px; background: #0056b3; color: white; font-weight: bold; }
-        button:hover { background: #004494; }
-        .status { margin-top: 20px; padding: 10px; border: 1px solid #ccc; font-family: monospace; }
-        h1 { color: #0056b3; font-size: 20px; }
+        :root { --water-color: #3498db; --valve-body: #2c3e50; --spring-color: #7f8c8d; }
+        body { font-family: 'Segoe UI', sans-serif; background: #eceff1; display: flex; flex-direction: column; align-items: center; }
+        .sim-container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 800px; margin-top: 20px; }
+        #valve-svg { width: 100%; height: 400px; }
+        .controls { display: flex; justify-content: space-around; padding: 20px; background: #f8f9fa; border-top: 2px solid #ddd; }
+        button { padding: 12px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; color: white; }
+        .btn-pegasus { background: #e67e22; } /* Color corporativo similar a HWM Pegasus */
+        .btn-close { background: #c0392b; }
+        .btn-open { background: #27ae60; }
+        .data-panel { display: flex; justify-content: space-between; padding: 10px; font-weight: bold; border: 1px solid #ccc; margin-bottom: 10px; }
+        
+        /* Animación del agua */
+        @keyframes flow { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
+        .water-line { stroke: var(--water-color); stroke-width: 40; fill: none; stroke-dasharray: 10, 5; animation: flow 1s linear infinite; opacity: 0.8; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Simulación de Control PRV - HWM Pegasus</h1>
-        <div class="valve-box">
-            <div id="waterFlow" class="water" style="width: 20%;"></div>
-            <div id="gate" class="gate" style="transform: translateY(0%);"></div>
-            <span style="z-index: 10; font-weight: bold; color: white;">VÁLVULA</span>
-        </div>
-        
-        <div class="status" id="panel">
-            MODO: Manual | Presión Salida: <span id="pOut">0</span> BAR
-        </div>
 
-        <div class="controls">
-            <button onclick="controlar(0)">CERRAR (100% Cámara Sup.)</button>
-            <button onclick="controlar(100)">VENTEO TOTAL (Pegasus+)</button>
-            <button onclick="modular('baja')">MODULAR: Baja Presión</button>
-            <button onclick="modular('alta')">MODULAR: Alta Presión</button>
-        </div>
-        
-        <p style="font-size: 12px; color: #666; margin-top: 20px;">
-            Simulación basada en el sistema <b>HWM Pegasus</b>. La modulación ajusta el piloto hidráulico electrónicamente.
-        </p>
+<div class="sim-container">
+    <h2 style="color: #004d40;">Simulador Pegasus: Válvula de Control Activo</h2>
+    <div class="data-panel">
+        <div>MODO: <span id="txtModo">STANDBY</span></div>
+        <div>PRESIÓN SALIDA: <span id="txtPresion">5.0</span> BAR</div>
     </div>
 
-    <script>
+    <svg id="valve-svg" viewBox="0 0 800 400">
+        <!-- Tubería -->
+        <rect x="0" y="250" width="800" height="60" fill="#95a5a6" />
+        <path id="flow-input" class="water-line" d="M 0 280 H 350" />
+        <path id="flow-output" class="water-line" d="M 450 280 H 800" />
+
+        <!-- Cuerpo Válvula -->
+        <path d="M 330 310 L 470 310 L 470 200 L 330 200 Z" fill="#34495e" />
+        
+        <!-- Diafragma y Cámara Superior (Controlada por Pegasus) -->
+        <rect id="chamber" x="300" y="100" width="200" height="40" fill="#2c3e50" rx="10" />
+        
+        <!-- Resorte (Spring) animado -->
+        <g id="spring-group" transform="translate(400, 140)">
+            <path id="spring" d="M -20 0 Q 20 10 -20 20 Q 20 30 -20 40 Q 20 50 -20 60 Q 20 70 -20 80" 
+                  fill="none" stroke="#7f8c8d" stroke-width="4" />
+        </g>
+
+        <!-- Obturador (Gate) -->
+        <rect id="gate" x="380" y="230" width="40" height="80" fill="#ecf0f1" style="transition: 0.5s;" />
+    </svg>
+
+    <div class="controls">
+        <button class="btn-close" onclick="updateValve(0, 'CIERRE MANUAL')">CERRAR (100% Cámara)</button>
+        <button class="btn-pegasus" onclick="updateValve(50, 'MODULACIÓN PEGASUS')">MODULAR (Punto Crítico)</button>
+        <button class="btn-open" onclick="updateValve(100, 'PEGASUS+ VENTEO')">ABRIR TOTAL (Sin Pérdida)</button>
+    </div>
+</div>
+
+<script>
+    function updateValve(percent, modo) {
         const gate = document.getElementById('gate');
-        const water = document.getElementById('waterFlow');
-        const pDisplay = document.getElementById('pOut');
-        const panel = document.getElementById('panel');
+        const spring = document.getElementById('spring-group');
+        const flowOut = document.getElementById('flow-output');
+        const txtPresion = document.getElementById('txtPresion');
+        document.getElementById('txtModo').innerText = modo;
 
-        function actualizarUI(apertura, modo, bar) {
-            // Apertura 0 (cerrado) a 100 (abierto total)
-            gate.style.transform = `translateY(-${apertura}%)`;
-            water.style.width = `${20 + (apertura * 0.8)}%`;
-            pDisplay.innerText = bar.toFixed(1);
-            panel.innerHTML = `MODO: ${modo} | Presión Salida: <span id="pOut">${bar.toFixed(1)}</span> BAR`;
-        }
+        // Mover Obturador (0% = abajo, 100% = arriba)
+        const moveY = (percent / 100) * 50;
+        gate.setAttribute('transform', `translate(0, -${moveY})`);
 
-        function controlar(apertura) {
-            let p = apertura === 0 ? 0.2 : 6.0;
-            let modo = apertura === 100 ? "Venteo Pegasus+ (Total)" : "Cierre Forzado";
-            actualizarUI(apertura, modo, p);
-        }
+        // Comprimir Resorte
+        const springScale = 1 - (percent / 200);
+        spring.setAttribute('transform', `translate(400, 140) scale(1, ${springScale})`);
 
-        function modular(tipo) {
-            if(tipo === 'baja') {
-                actualizarUI(30, "Modulación por Tiempo/Caudal", 2.5);
-            } else {
-                actualizarUI(70, "Punto Crítico Activo", 4.8);
-            }
+        // Ajustar flujo visual y presión simulada
+        if (percent === 0) {
+            flowOut.style.display = 'none';
+            txtPresion.innerText = "0.2";
+        } else {
+            flowOut.style.display = 'block';
+            flowOut.style.strokeWidth = 10 + (percent * 0.3);
+            txtPresion.innerText = (percent * 0.07).toFixed(1);
         }
-    </script>
+    }
+</script>
+
 </body>
 </html>
+
